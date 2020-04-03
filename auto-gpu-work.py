@@ -23,6 +23,8 @@ session_data_file = "session.pkl"
 config_file = "config.ini"
 worktodo_file = "worktodo.txt"
 results_file = "results.txt"
+old_results_folder = "old_results"
+old_results_html_name = "results.html"
 
 def get_gpu_work(num_jobs=1):
     cores = 1
@@ -77,6 +79,9 @@ def mersenne_login():
         pickle.dump(s, f)
 
 def post_results():
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+
     try:
         with open(session_data_file, 'rb') as f:
             s = pickle.load(f)
@@ -89,11 +94,13 @@ def post_results():
 
     with open(results_file, 'r') as f:
         payload = {
-            'was_logged_in_s': '',
-            'data': '',
+            'was_logged_in_s': config['User Info']['username'],
+            'data': f.read(),
         }
         print(payload)
-        # s.post(post_manual_results_url, payload)
+        r = s.post(post_manual_results_url, payload)
+
+        print(r.text)
 
 def main():
     # get_gpu_work()
