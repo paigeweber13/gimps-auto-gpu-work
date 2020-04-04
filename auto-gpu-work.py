@@ -44,11 +44,12 @@ def get_gpu_work(num_jobs=1):
         print("error retrieving new work! Got error code ", r.status_code)
         sys.exit(NETWORK_ERROR_CODE)
     
-    m = re.search(r"<!--BEGIN_ASSIGNMENTS_BLOCK-->(?P<work>.*)"
-                   "\\n<!--END_ASSIGNMENTS_BLOCK-->", r.text)
+    pattern = re.compile(r"<!--BEGIN_ASSIGNMENTS_BLOCK-->(?P<work>.*)"
+                    "<!--END_ASSIGNMENTS_BLOCK-->", re.DOTALL)
+    m = pattern.search(r.text)
 
     with open(worktodo_file, 'a') as f:
-        f.write(m.group("work") + '\n')
+        f.write(m.group("work"))
 
 def mersenne_login():
     s = requests.Session()
@@ -103,9 +104,9 @@ def post_results():
         print(r.text)
 
 def main():
-    # get_gpu_work()
+    get_gpu_work(1000)
     # mersenne_login()
-    post_results()
+    # post_results()
 
 if __name__ == "__main__":
     main()
