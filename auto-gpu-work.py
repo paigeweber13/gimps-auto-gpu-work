@@ -1,5 +1,8 @@
 # built-in
 import configparser
+import datetime
+import os
+import pathlib
 import pickle
 import re
 import sys
@@ -12,6 +15,7 @@ BAD_PARAMS_CODE = 1
 NETWORK_ERROR_CODE = 2
 BAD_CONFIG_CODE = 3
 BAD_SESSION_CODE = 4
+NO_RESULTS_CODE = 5
 
 # urls
 login_url = "https://www.mersenne.org/"
@@ -83,6 +87,17 @@ def post_results():
     config = configparser.ConfigParser()
     config.read('config.ini')
 
+    # try to create a folder for old results
+    try:
+        pathlib.Path(old_results_folder).mkdir(exist_ok=True)
+    except OSError as e:
+        print("problem with creating folder!")
+        print()
+        raise
+
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
+
+    # load session
     try:
         with open(session_data_file, 'rb') as f:
             s = pickle.load(f)
@@ -90,23 +105,50 @@ def post_results():
         print("session data not found on disk. Please login.")
         sys.exit(BAD_SESSION_CODE)
 
-    # search for the string "login session expired" in the response to check if
-    # login is still valid.
+    try:
+        with open(results_file, 'r') as f:
+            payload = {
+                'was_logged_in_as': config['User Info']['username'],
+                'data': f.read(),
+            }
 
-    with open(results_file, 'r') as f:
-        payload = {
-            'was_logged_in_s': config['User Info']['username'],
-            'data': f.read(),
-        }
-        print(payload)
-        r = s.post(post_manual_results_url, payload)
+            print("sending data...")
+            r = s.post(post_manual_results_url, payload)
 
-        print(r.text)
+            if r.status_code != 200:
+                print("Network problem while sending results.")
+                print("error is:", r.status_code)
+                sys.exit(NETWORK_ERROR_CODE)
+
+            if re.search(r'login session expired', r.text):
+                print("Login session expired! Please login and try again.")
+                sys.exit(BAD_SESSION_CODE)
+    except FileNotFoundError:
+        print("no results file! you need to check factoring to get results "
+              "before running this script.")
+        sys.exit(NO_RESULTS_CODE)
+
+    # write response to html file for examination if desired
+    html_name_components = old_results_html_name.split(sep='.')
+    new_html_name = html_name_components[0] + '_' + timestamp + '.' + \
+                    html_name_components[1]
+
+    with open(old_results_folder + '/' + new_html_name, 'w') as f:
+        f.write(r.text)
+
+    # move results file
+    results_name_components = results_file.split(sep='.')
+    new_results_file_name = results_name_components[0] + '_' + timestamp \
+                            + '.' + results_name_components[1]
+
+    # copy
+    os.rename(results_file, old_results_folder + '/' + new_results_file_name)
 
 def main():
-    get_gpu_work(1000)
+    # get_gpu_work(1000)
     # mersenne_login()
     # post_results()
+    post_results()
 
 if __name__ == "__main__":
     main()
