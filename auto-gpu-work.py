@@ -2,6 +2,7 @@
 # - if no 'config.yml' file exists, program un-gracefully dies
 
 # built-in
+import argparse
 import configparser
 import datetime
 import os
@@ -168,12 +169,44 @@ def auto_run():
 
         post_results()
 
+def setup_argparser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-a', '--auto-run', action='store_true',
+        help='run entire workflow until interrupted with ctrl-c')
+    parser.add_argument('-g', '--get-gpu-work', nargs=1,
+        help='get new work for from mersenne.org. Supply the number of work ' 
+        'assignments to get as the only argument.')
+    parser.add_argument('-l', '--login', action='store_true',
+        help='login to mersenne.org. Required to post results. Before you can '
+        'do this, you must copy "example_config.ini" to "config.ini" and add '
+        'your username and password')
+    parser.add_argument('-p', '--post-results', action='store_true',
+        help='send completed work to mersenne.org. Be sure to login first!')
+
+    args = parser.parse_args()
+    return args
+
 def main():
-    # get_gpu_work(1000)
-    # mersenne_login()
-    # post_results()
-    # post_results()
-    auto_run()
+    args = setup_argparser()
+
+    num_args_supplied = 0
+
+    if args.auto_run:
+        auto_run()
+        num_args_supplied += 1
+    if args.get_gpu_work:
+        get_gpu_work(args.get_gpu_work)
+        num_args_supplied += 1
+    if args.login:
+        mersenne_login()
+        num_args_supplied += 1
+    if args.post_results:
+        post_results();
+        num_args_supplied += 1
+    
+    if num_args_supplied == 0:
+        print('no arguments supplied! start with "-h" to see all options')
 
 if __name__ == "__main__":
     main()
