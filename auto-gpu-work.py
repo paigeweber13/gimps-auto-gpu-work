@@ -1,3 +1,6 @@
+### TODO:
+# - if no 'config.yml' file exists, program un-gracefully dies
+
 # built-in
 import configparser
 import datetime
@@ -5,6 +8,8 @@ import os
 import pathlib
 import pickle
 import re
+import signal
+import subprocess
 import sys
 
 # third-party
@@ -29,6 +34,16 @@ worktodo_file = "worktodo.txt"
 results_file = "results.txt"
 old_results_folder = "old_results"
 old_results_html_name = "results.html"
+
+def check_config_file(config):
+    if 'User Info' not in config or 'username' not in config['User Info']:
+        print('Malformed config.ini file! Please redownload it.')
+        sys.exit(BAD_CONFIG_CODE)
+
+    if config['User Info']['username'] == '' or \
+            config['User Info']['password'] == '':
+        print('Please open config.ini and add your username and/or password')
+        sys.exit(BAD_CONFIG_CODE)
 
 def get_gpu_work(num_jobs=1):
     cores = 1
@@ -58,16 +73,8 @@ def get_gpu_work(num_jobs=1):
 def mersenne_login():
     s = requests.Session()
     config = configparser.ConfigParser()
-    config.read('config.ini')
-
-    if 'User Info' not in config or 'username' not in config['User Info']:
-        print('Malformed config.ini file! Please redownload it.')
-        sys.exit(BAD_CONFIG_CODE)
-
-    if config['User Info']['username'] == '' or \
-            config['User Info']['password'] == '':
-        print('Please open config.ini and add your username and/or password')
-        sys.exit(BAD_CONFIG_CODE)
+    config.read(config_file)
+    check_config_file(config)
 
     payload = {
         'user_login': config['User Info']['username'],
@@ -85,7 +92,8 @@ def mersenne_login():
 
 def post_results():
     config = configparser.ConfigParser()
-    config.read('config.ini')
+    config.read(config_file)
+    check_config_file(config)
 
     # try to create a folder for old results
     try:
@@ -144,11 +152,28 @@ def post_results():
     # copy
     os.rename(results_file, old_results_folder + '/' + new_results_file_name)
 
+def interrupt_handler(signal_received, frame):
+    print('SIGINT (ctrl-c) received, exiting...')
+    sys.exit(0)
+
+def auto_run():
+    signal.signal(signal.SIGINT, interrupt_handler)
+
+    while(True):
+        num_lines = sum(1 for line in open('worktodo.txt', 'r'))
+        if num_lines == 0:
+            get_gpu_work(50)
+    
+        subprocess.run(['./mfaktc.exe'])
+
+        post_results()
+
 def main():
     # get_gpu_work(1000)
     # mersenne_login()
     # post_results()
-    post_results()
+    # post_results()
+    auto_run()
 
 if __name__ == "__main__":
     main()
